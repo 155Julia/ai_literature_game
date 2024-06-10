@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Chatroom with Gemini API</title>
+    <style>
+        body {
+            color: white;
+            font-family: 'Courier New', Courier, monospace;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background: #000;
+            /* Default background in case image doesn't load */
+        }
+
+        #backgroundWrapper {
+            width: 80vw;
+            /* Use viewport width units */
+            max-width: 800px;
+            /* Maximum width remains 800px */
+            height: 80vw;
+            /* Height is set to be the same in viewport width units, approximating the width */
+            max-height: 800px;
+            /* Maximum height to match the maximum width */
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            background-image: url('./img/start.gif');
+            /* Replace with your image path */
+            background-size: contain;
+            /* Ensures the image is fully visible without stretching */
+            background-repeat: no-repeat;
+            background-position: center bottom;
+        }
+
+        #gameContainer {
+            width: 100%;
+            /* Takes the full width of the background wrapper */
+            height: 200px;
+            /* Adjusted height to position at the bottom of the image */
+            background: rgba(0, 0, 0, 0.8);
+            /* Semi-transparent black background */
+            padding: 10px;
+            display: none;
+            box-sizing: border-box;
+            border: 1px solid #fff;
+            overflow: hidden;
+        }
+
+        #messages {
+            height: 80%;
+            overflow-y: auto;
+            margin-bottom: 10px;
+        }
+
+        .message {
+            margin: 5px 0;
+        }
+
+        .userMessage {
+            color: #0f0;
+        }
+
+        .botMessage {
+            color: #ff0;
+        }
+
+        #messageInput {
+            width: 100%;
+            padding: 10px;
+            box-sizing: border-box;
+            background: transparent;
+            border: none;
+            border-top: 1px solid #fff;
+            color: white;
+            font-size: 16px;
+        }
+
+        #startButton, #introButton {
+            padding: 15px 30px;
+            /* Increase padding for a better look */
+            font-size: 20px;
+            /* Adjust font size */
+            cursor: pointer;
+            /* Position it within the wrapper */
+            margin-bottom: 20px;
+            color: white;
+            /* Text color */
+            background: rgba(0, 0, 0, 0.8);
+            /* Same semi-transparent background as introBlock */
+            border: 1px solid #fff;
+            /* Same border as introBlock */
+            border-radius: 5px;
+            /* Rounded corners similar to introBlock */
+            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.3);
+            /* Subtle shadow for depth */
+            transition: all 0.3s ease;
+            /* Smooth transition for hover effects */
+        }
+
+        #startButton:hover,
+        #introButton:hover {
+            background: rgba(0, 0, 0, 1);
+            /* Darker background on hover */
+            box-shadow: 0px 6px 15px rgba(0, 0, 0, 0.5);
+            /* Slightly larger shadow on hover */
+            transform: scale(1.05);
+            /* Slightly enlarge on hover */
+        }
+
+        #introBlock {
+            width: 80%;
+            max-width: 600px;
+            background: rgba(0, 0, 0, 0.8);
+            /* Semi-transparent background */
+            padding: 20px;
+            box-sizing: border-box;
+            border: 1px solid #fff;
+            margin-bottom: 20px;
+            /* Space between intro block and start button */
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            display: none;
+            /* Initially hidden */
+        }
+    </style>
+</head>
+
+<body>
+    <div id="introBlock">
+        <h2>歡迎來到《羅密歐與茱莉葉的愛情冒險故事》</h2>
+        <p>在《羅密歐與茱莉葉的愛情冒險故事》中，每一個選擇都將帶來不同的結果和體驗。你將扮演故事中的羅密歐，請幫助他完成整個故事發展，選擇沒有對錯，這是一場純粹的體驗之旅，請享受在愛情中的酸甜苦辣。</p>
+        <button id="startButton">Start Game</button>
+    </div>
+    <div id="backgroundWrapper">
+        <button id="introButton">遊戲介紹</button>
+        <div id="gameContainer">
+            <div id="messages"></div>
+            <form id="messageForm">
+                <input type="text" id="messageInput" placeholder="Type your command...">
+            </form>
+        </div>
+    </div>
+
+</body>
+<script>
+    var conversationHistory = [];
+
+    var apiKey = prompt("Please enter your API key:", "");
+
+    
+    if (!apiKey) {
+        alert("API key are required to use the chatroom.");
+        // Optionally, redirect or disable form
+    } else {
+        document.getElementById('messageForm').addEventListener('submit', function (event) {
+            event.preventDefault();
+            var inputElement = document.getElementById('messageInput');
+            var message = inputElement.value;
+
+            addToConversationHistory('user', message);
+            displayMessage(message, 'user');
+            inputElement.disabled = true;
+            fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=' + apiKey, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    "contents": conversationHistory,
+                    "safetySettings": [
+                        {
+                            "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+                            "threshold": "BLOCK_NONE"
+                        },
+                        {
+                            "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                            "threshold": "BLOCK_NONE"
+                        },
+                    ],
+                    "generationConfig": {
+                        "stopSequences": [
+                            ""
+                        ],
+                        "temperature": 2.0,
+                        "maxOutputTokens": 2048,
+                        "topP": 0.8,
+                        "topK": 10
+                    }
+                })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    var responseText = data.candidates[0].content.parts[0].text;
+                    addToConversationHistory('model', responseText);
+                    displayMessage(responseText, 'bot');
+                    inputElement.disabled = false;
+                })
+                .catch(error => {
+                    console.error('Error:', error)
+                    inputElement.disabled = false;
+                });
+
+            document.getElementById('messageInput').value = '';
+        });
+    }
+
+    function addToConversationHistory(role, text) {
+        conversationHistory.push({
+            "role": role,
+            "parts": [{
+                "text": text
+            }]
+        });
+    }
+
+    function displayMessage(message, sender) {
+        var messageElement = document.createElement('div');
+        var formatMessage = formatText(message);
+        messageElement.classList.add('message');
+        if (sender === 'user') {
+            messageElement.classList.add('userMessage');
+        } else {
+            messageElement.classList.add('botMessage');
+        }
+        console.log("hello1");
+        document.getElementById('messages').appendChild(messageElement);
+        updateSceneImage(message);
+
+        // Function to display the text one character at a time
+        function typeText(element, text, index) {
+            if (index < text.length) {
+                let char = text[index];
+                if (char === '<') {
+                    let endIndex = text.indexOf('>', index);
+                    if (endIndex !== -1) {
+                        element.innerHTML += text.substring(index, endIndex + 1);
+                        index = endIndex + 1;
+                    }
+                } else {
+                    element.innerHTML += char;
+                    index++;
+                }
+                setTimeout(function () {
+                    typeText(element, text, index);
+                }, 75); // Adjust typing speed by changing the delay (in milliseconds)
+            } else {
+                // Scroll to bottom after the entire message is displayed
+                document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
+            }
+        }
+
+        // Start typing the formatted message
+        typeText(messageElement, formatMessage, 0);
+    }
+
+    function updateSceneImage(responseText) {
+        console.log("hello2");
+        let sceneMatch = responseText.match(/場景(.*?)\s/); // 使用正則表達式匹配場景描述
+        if (sceneMatch && sceneMatch[1]) {
+            console.log("hello3");
+            let scene = sceneMatch[1];
+            console.log(scene);
+            // 檢查scene是否包含"宿舍"
+            if (scene.includes("舞會")) {
+                document.getElementById('backgroundWrapper').style.backgroundImage = "url('./img/ball.webp')";
+            } else if (scene.includes("書房")) {
+                document.getElementById('backgroundWrapper').style.backgroundImage = "url('./img/library.webp')";
+            } else if (scene.includes("花園")) {
+                document.getElementById('backgroundWrapper').style.backgroundImage = "url('./img/park.webp')";
+            } else if (scene.includes("後院")) {
+                document.getElementById('backgroundWrapper').style.backgroundImage = "url('./img/yard.png')";
+            } else if (scene.includes("森林")) {
+                document.getElementById('backgroundWrapper').style.backgroundImage = "url('./img/forest.webp')";
+            } else if (scene.includes("幸福家園")) {
+                document.getElementById('backgroundWrapper').style.backgroundImage = "url('./img/happy.png')";
+            } else if (scene.includes("森林邊境")) {
+                document.getElementById('backgroundWrapper').style.backgroundImage = "url('./img/tragedy.png')";
+            }
+        }
+    }
+
+    function formatText(text) {
+        // Replace ** with a new line and bold tag
+        let formattedText = text.replace(/\*\*(.*?)\*\*/g, '<br><strong>$1</strong>');
+
+        // Replace * with a new line and bullet point
+        formattedText = formattedText.replace(/\*(.*?)\s/g, '<br>$1');
+
+        return formattedText;
+    }
+
+    document.getElementById('introButton').addEventListener('click', function () {
+        document.getElementById('introBlock').style.display = 'block';
+        this.style.display = 'none'; // Hide the intro button
+        document.getElementById('startButton').style.display = 'block'; // Show the start button
+    });
+
+    document.getElementById('startButton').addEventListener('click', function () {
+        // Change background image and display settings when starting the game
+        document.getElementById('backgroundWrapper').style.backgroundImage = "url('./img/ball.webp')";
+        document.getElementById('introBlock').style.display = 'none'; // Show the game container
+        document.getElementById('gameContainer').style.display = 'inline';
+        document.getElementById('introButton').style.display = 'none'; // Hide the start button
+
+        conversationHistory.push({
+            "role": 'user',
+            "parts": [{
+                "text": 
+                `
+                    ## 你是一個遊戲設計師，開發了一款文字冒險遊戲。以下是遊戲的腳本大綱順序，根據**腳本**中的內容進行遊戲對話的生成。
+                        1. 【第一章：相遇】
+                        2. 【第二章：秘密約會】
+                        3. 【第三章：逃亡之路】
+                        4. 【最終章：結局】
+                        5. 【遊戲結尾】
+                            
+                    ## 注意事項（一定要完成）
+                        1. 不要一次全部把腳本都呈現出來，一次一個場景
+                        2. 不要創造出其他不是腳本的內容
+                        3. 根據我的選擇進行故事就好，**不要幫我做出選擇**
+                        4. 最終故事會有兩種結局，根據我的選擇來呈現
+                        5. 結局呈現完後，要求玩家輸入end，以呈現遊戲結尾的省思來結束遊戲
+                        6. 每次輸出只能有一個場景
+                        7. 按照範例的樣子，有換行的地方都要換行
+                        8. 每次開始遊玩都先從第一章開始，不要從中間開始
+                        9. 請確定回答完全正確，我會給你很多小費
+
+                    ## 故事背景
+                        遊戲標題：羅密歐與茱莉葉的愛情冒險故事
+                        遊戲背景：羅密歐和茱莉葉在舞會上相遇，彼此一見鐘情，但他們雙方的家族是世仇，註定不能夠在一起。玩家會以羅密歐的視角與茱莉葉進行對話，根據玩家的選擇，故事會有兩種不同的結局。
+                        主要角色：
+                            1. 羅密歐：蒙太古家族的年輕人，充滿熱情和浪漫，對茱莉葉一見鐘情，願意為了愛情付出一切。
+                            2. 茱莉葉：卡普萊特家族的女兒，美麗而聰慧，與羅密歐相愛，願意冒險挑戰家族的傳統。
+                        
+                    ## 腳本
+                        【第一章：相遇】
+                        （場景：舞會）
+                        （描述）羅密歐和茱莉葉在人群中相遇，當你看到茱莉葉時便一見鐘情，想認識她。
+                        （選擇）選擇A：「美麗的小姐，我從未見過如此動人的面孔，請問您的名字是？」（選擇後進入書房場景）
+                        選擇B：「我是羅密歐，蒙太古家的子孫，請問您的名字是？」（選擇後進入書房場景）
+
+                        若選擇A，茱莉葉回答：「我是茱莉葉，卡普萊特家的女兒。你呢？」羅密歐：「我是羅密歐，蒙太古家的子孫。」茱莉葉：「很高興認識你，羅密歐。我們或許能找個安靜的地方聊聊。」
+                        若選擇B，茱莉葉回答：「很高興認識你，羅密歐。我們或許能找個安靜的地方聊聊。」
+
+                        【第一章：相遇】
+                        （場景：書房）
+                        （描述）羅密歐和茱莉葉來到了鮮少有人的書房，羅密歐對茱莉葉說：「這裡很安靜，我們可以暢所欲言了。」
+                        （選擇）選擇A：「茱莉葉，我對你一見鐘情，想了解更多關於你的事。」（選擇後進入花園場景）
+                        選擇B：「我們的家族之間有許多矛盾，但我不在乎這些，我只在乎你。」（選擇後進入花園場景）
+
+                        （回應）若選擇A，茱莉葉回答：「「我也對你有同樣的感覺，羅密歐。我是家中的獨生女，喜歡讀書和園藝。」羅密歐：「好像有人來了我們得快點離開！」
+                        若選擇B，茱莉葉回答：「我很高興聽到你這麼說，羅密歐。我的生活其實很單調，但自從見到你，一切都變得不一樣了。」羅密歐：「好像有人來了我們得快點離開！」
+
+                        【第一章：相遇】
+                        （場景：花園）
+                        （描述）羅密歐和茱莉葉來到了隱密的花園，羅密歐說：「茱莉葉，我們的相遇真是命運的安排。我希望能夠再次見到你。」茱莉葉：「我們應該選擇一個時間和地點來秘密見面。」羅密歐：「就在你家後院吧！」茱莉葉：「那時間呢？」
+                        （選擇）選擇A，晚上 10 點（選擇後進入第二章劇情）
+                        選擇B，凌晨 2 點（選擇後進入第二章劇情）
+
+                        （回應）若選擇A，茱莉葉回答：「晚上 10 點我家裡人還沒睡，我怕被發現，還是凌晨 2 點吧！」
+                        若選擇B，茱莉葉回答：「凌晨 2 點我可以溜出來，我們在我家後院見吧。」
+
+
+                        【第二章：秘密約會】
+                        （場景：後院）
+                        （描述）隔天凌晨 2 點，羅密歐偷偷闖進茱莉葉家的後院赴約，請幫羅密歐選擇對話的進展
+                        （選擇）選擇A，談論家族的對立（選擇後進入第三章劇情）
+                        選擇B，甜蜜地交談（選擇後進入第三章劇情）
+
+                        （回應）若選擇A，羅密歐：「我們的家族如此對立，這愛情真的有希望嗎？」茱莉葉：「愛情超越一切，我們一定能找到出路。」羅密歐：「我想帶妳離開這裡，我們一起去遠方。」茱莉葉：「我也這麼想，我們一起計劃吧。」
+                        若選擇B，羅密歐：「妳是我見過最美麗的人。」茱莉葉：「羅密歐，妳讓我的心跳加速。」對話完後，因對話聲音過於大聲，被茱莉葉家人發現，接著他們便開始逃亡。
+
+                        【第三章：逃亡之路】
+                        （場景：森林）
+                        （描述）為了愛情的自由，羅密歐和茱莉葉開始逃亡，他們來到了森林裡，竟然被雙方家族的追兵趕上了
+                        （選擇）選擇A，戰鬥（選擇後進入最終章劇情，場景為森林邊境）
+                        選擇B，躲藏（選擇後進入最終章，場景為幸福家園）
+
+                        （回應）若選擇A，羅密歐：「我們要保護自己，準備戰鬥！」茱莉葉：「我會和你一起面對。」
+                        若選擇B，羅密歐：「我們找個地方躲起來，等危險過去。」茱莉葉：「那裡有個隱蔽的地方，快過來。」
+
+                        【最終章：結局】
+                        （場景：森林邊境）（若選擇A進入這個場景）
+                        （描述）羅密歐和茱莉葉被雙方家族攻擊，不幸身亡。
+                        羅密歐：「茱莉葉，我們被包圍了……」茱莉葉：「不管發生什麼，我都愛你，羅密歐。」
+
+                        （場景：幸福家園）（若選擇B進入這個場景）
+                        （描述）羅密歐和茱莉葉成功逃離，找到了一個安全的地方生活，過上幸福的生活。
+                        羅密歐：「我們終於成功了，茱莉葉。」茱莉葉：「是的，從此我們再也不分開。」
+
+                        【遊戲結尾】
+                        每一個選擇都改變了我們的命運，羅密歐與朱莉葉提醒我們在生活中每個決定的重要性。另外，家族之間的對立也讓我們學會了和解和寬恕的重要性，認識到仇恨只會帶來更多的痛苦。起許將來我們都能在現實生活中更加謹慎地做出選擇，並珍惜和愛人的每一刻。
+
+                    ## 以下面範例為例子，這對我很重要，**括號內的文字為給你注意事項，不要呈現出來**，按照範例的樣子，**有換行的地方都要換行**，請確定回答完全正確，我會給你很多小費。
+                        ### 輸出範例1
+                        【第一章：相遇】
+                        <場景>：舞會
+                        <描述>：羅密歐和茱莉葉在人群中相遇，當你看到茱莉葉時便一見鐘情，想認識她。
+                        <選擇>：選擇A：「美麗的小姐，我從未見過如此動人的面孔，請問您的名字是？」
+                        選擇B：「我是羅密歐，蒙太古家的子孫，請問您的名字是？」
+
+                        ### 輸入範例1
+                        A
+
+                        ### 輸出範例2
+                        <回應>：茱莉葉回答：「我是茱莉葉，卡普萊特家的女兒。你呢？」羅密歐：「我是羅密歐，蒙太古家的子孫。」茱莉葉：「很高興認識你，羅密歐。我們或許能找個安靜的地方聊聊。」
+                        請打ok繼續
+
+                        ### 輸入範例2
+                        ok
+
+                        ### 輸出範例3
+                        【第一章：相遇】
+                        <場景>：書房
+                        <描述>：羅密歐和茱莉葉來到了鮮少有人的書房，羅密歐對茱莉葉說：「這裡很安靜，我們可以暢所欲言了。」
+                        <選擇>：選擇A：「茱莉葉，我對你一見鐘情，想了解更多關於你的事。」
+                        選擇B：「我們的家族之間有許多矛盾，但我不在乎這些，我只在乎你。」
+
+                        ### 輸入範例3
+                        B
+
+                        ### 輸出範例4
+                        <回應>：茱莉葉回答：「我很高興聽到你這麼說，羅密歐。我的生活其實很單調，但自從見到你，一切都變得不一樣了。」羅密歐：「好像有人來了我們得快點離開！」
+                        請打ok繼續
+
+                        ### 輸入範例4
+                        ok
+
+                        ### 輸出範例5
+                        【第一章：相遇】
+                        <場景>：花園
+                        <描述>：羅密歐和茱莉葉來到了隱密的花園，羅密歐說：「茱莉葉，我們的相遇真是命運的安排。我希望能夠再次見到你。」茱莉葉：「我們應該選擇一個時間和地點來秘密見面。」羅密歐：「就在你家後院吧！」茱莉葉：「那時間呢？」
+                        <選擇>：選擇A，晚上 10 點
+                        選擇B，凌晨 2 點
+
+                        ### 輸入範例5
+                        A
+
+                        ### 輸出範例6
+                        <回應>：茱莉葉回答：「晚上 10 點我家裡人還沒睡，我怕被發現，還是凌晨 2 點吧！」
+                        請打ok繼續
+
+                    `
+            }]
+        })
+        fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=' + apiKey, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                "contents": conversationHistory,
+                "safetySettings": [
+                    {
+                        "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+                        "threshold": "BLOCK_NONE"
+                    },
+                    {
+                        "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                        "threshold": "BLOCK_NONE"
+                    },
+                ],
+                "generationConfig": {
+                    "stopSequences": [
+                        ""
+                    ],
+                    "temperature": 2.0,
+                    "maxOutputTokens": 2048,
+                    "topP": 0.8,
+                    "topK": 10
+                }
+            })
+        })
+            .then(response => response.json())
+            .then(data => {
+                console.log(conversationHistory);
+                var responseText = data.candidates[0].content.parts[0].text;
+                addToConversationHistory('model', responseText);
+                displayMessage(responseText, 'bot');
+            })
+            .catch(error => console.error('Error:', error));
+    });
+
+
+
+</script>
+
+</html>
